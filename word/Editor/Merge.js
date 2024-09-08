@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -373,8 +373,10 @@
         for (let i = oNode.children.length - 1; i >= 0; i -= 1) {
             const oChildNode = oNode.children[i];
             if (i !== oNode.children.length - 1) {
-                oChildNode.tryUpdateNode(this);
-                oChildNode.resolveTypesWithPartner(this);
+							if (oChildNode.partner && oChildNode.element instanceof CTextElement) {
+								oChildNode.tryUpdateNode(this);
+								oChildNode.resolveTypesWithPartner(this);
+							}
             }
             if (currentChangeId < oNode.changes.length && oNode.changes[currentChangeId].anchor.index === i) {
                 const aContentToInsert = oNode.getArrOfInsertsFromChanges(currentChangeId, this);
@@ -496,6 +498,7 @@
         const oPartnerNode = this.partner;
         if (oPartnerNode)
         {
+					let oSplitRun;
             const oOriginalTextElement = this.element;
             const oPartnerTextElement = oPartnerNode.element;
             if (oPartnerTextElement.elements.length > oOriginalTextElement.elements.length) {
@@ -507,6 +510,7 @@
                 const bIsWordEndWithText = oPartnerTextElement.isWordEndWith(oOriginalTextElement);
 
                 const oParagraph = oOriginalTextElement.lastRun.Paragraph;
+								const oMainMockParagraph = this.par.element;
                 if (bIsWordBeginWithText) {
                     for (let i = 0; i < oOriginalTextElement.elements.length; i += 1) {
                         oNewOriginalTextElement.addToElements(oOriginalTextElement.elements[i], oOriginalTextElement.reviewElementTypes[i]);
@@ -535,42 +539,50 @@
                     } else {
                         nLastPartnerElementPosition = oCurrentRun.GetElementPosition(oPartnerTextElement.elements[oPartnerTextElement.elements.length - 1]);
                     }
-                    oCurrentRun.Split2(nLastPartnerElementPosition + 1);
+	                oSplitRun = oCurrentRun.Split2(nLastPartnerElementPosition + 1);
+										oMockParagraph.Add_ToContent(nCurrentRunPosition + 1, oSplitRun);
                     const arrContentForInsert = [];
                     while (nAmountOfAddingElements) {
                         const oReviewInfo = comparison.getCompareReviewInfo(oCurrentRun);
                         for (let i = oCurrentRun.Content.length - 1; i >= 0; i -= 1) {
                             nAmountOfAddingElements -= 1;
-                            if (nAmountOfAddingElements === 0) {
+                            if (nAmountOfAddingElements === 0 && i !== 0) {
                                 oCurrentRun = oCurrentRun.Split2(i);
+	                            oMockParagraph.Add_ToContent(nCurrentRunPosition + 1, oCurrentRun);
                                 break;
                             }
                         }
-                        for (let i = 0; i < oCurrentRun.Content.length; i += 1) {
-                            oNewOriginalTextElement.addToElements(oCurrentRun.Content[i], oReviewInfo);
+												const oCopyCurrentRun = oCurrentRun.Copy(false, {CopyReviewPr: true});
+                        for (let i = 0; i < oCopyCurrentRun.Content.length; i += 1) {
+                            oNewOriginalTextElement.addToElements(oCopyCurrentRun.Content[i], oReviewInfo);
                         }
-                        arrContentForInsert.push(oCurrentRun.Copy(false, {CopyReviewPr: true}));
+                        arrContentForInsert.push(oCopyCurrentRun);
                         nCurrentRunPosition -= 1;
                         oCurrentRun = oMockParagraph.Content[nCurrentRunPosition];
                     }
                     let nLastOriginalElementPosition;
                     let nLastRunPosition;
+										let nMockRunPosition;
                     if (bIsWordBeginWithText) {
                         nLastRunPosition = oOriginalTextElement.lastRun.GetPosInParent();
+	                    nMockRunPosition = oOriginalTextElement.lastRun.GetPosInParent(oMainMockParagraph);
                         oNewOriginalTextElement.lastRun = arrContentForInsert[0];
                         nLastOriginalElementPosition = oParagraph.Content[nLastRunPosition].GetElementPosition(oOriginalTextElement.elements[oOriginalTextElement.elements.length - 1]);
-                        oParagraph.Content[nLastRunPosition].Split2(nLastOriginalElementPosition + 1, oParagraph, nLastRunPosition)
+                        oSplitRun = oParagraph.Content[nLastRunPosition].Split2(nLastOriginalElementPosition + 1, oParagraph, nLastRunPosition)
+	                    oMainMockParagraph.Add_ToContent(nLastRunPosition + 1, oSplitRun);
                     } else {
                         nLastRunPosition = oOriginalTextElement.firstRun.GetPosInParent();
+	                    nMockRunPosition = oOriginalTextElement.firstRun.GetPosInParent(oMainMockParagraph);
                         nPreviousRunPosition = nLastRunPosition + arrContentForInsert.length;
                         nLastOriginalElementPosition = oParagraph.Content[nLastRunPosition].GetElementPosition(oOriginalTextElement.elements[0]);
-                        oParagraph.Content[nLastRunPosition].Split2(nLastOriginalElementPosition/* + 1*/, oParagraph, nLastRunPosition);
+	                    oSplitRun = oParagraph.Content[nLastRunPosition].Split2(nLastOriginalElementPosition, oParagraph, nLastRunPosition);
+	                    oMainMockParagraph.Add_ToContent(nMockRunPosition + 1, oSplitRun);
                         oNewOriginalTextElement.firstRun = arrContentForInsert[0];
                     }
 
-                    //oParagraph.Content[nLastRunPosition].Split2(nLastOriginalElementPosition + 1, oParagraph, nLastRunPosition)
                     for (let i = 0; i < arrContentForInsert.length; i += 1) {
                         oParagraph.Add_ToContent(nLastRunPosition + 1, arrContentForInsert[i]);
+												oMainMockParagraph.Add_ToContent(nMockRunPosition + 1, arrContentForInsert[i]);
                     }
                 }
 
@@ -673,6 +685,9 @@
     function CMockParagraph() {
         this.Content = [];
     }
+	CMockParagraph.prototype.Add_ToContent = function (position, element) {
+		this.Content.splice(position, 0, element);
+	};
 
     function CMockMinHash() {
         this.count = 0;
@@ -701,17 +716,26 @@
     CDocumentMergeComparison.prototype = Object.create(CDocumentComparison.prototype);
     CDocumentMergeComparison.prototype.constructor = CDocumentMergeComparison;
 
+	CDocumentMergeComparison.prototype.insertCopyTextBoxContent = function (oBaseShape, oTextBoxContent) {
+		this.executeDisableSkipUpdateInfo(function () {
+			CDocumentComparison.prototype.insertCopyTextBoxContent.call(this, oBaseShape, oTextBoxContent);
+		}.bind(this));
+	};
+	CDocumentMergeComparison.prototype.executeDisableSkipUpdateInfo = function (callback) {
+		const bOldSkipUpdateInfo = this.copyPr.SkipUpdateInfo;
+		const bSaveCustomReviewType = this.copyPr.bSaveCustomReviewType;
+		this.copyPr.SkipUpdateInfo = false;
+		this.copyPr.bSaveCustomReviewType = true;
+		callback();
+		this.copyPr.SkipUpdateInfo = bOldSkipUpdateInfo;
+		this.copyPr.bSaveCustomReviewType = bSaveCustomReviewType;
+	};
+
     CDocumentMergeComparison.prototype.executeWithCheckInsertAndRemove = function (callback, oChange) {
         if (!oChange.remove.length || !oChange.insert.length) {
-            const bOldSkipUpdateInfo = this.copyPr.SkipUpdateInfo;
-            const bSaveCustomReviewType = this.copyPr.bSaveCustomReviewType;
-            this.copyPr.SkipUpdateInfo = false;
-            this.copyPr.bSaveCustomReviewType = true;
-            callback();
-            this.copyPr.SkipUpdateInfo = bOldSkipUpdateInfo;
-            this.copyPr.bSaveCustomReviewType = bSaveCustomReviewType;
+					this.executeDisableSkipUpdateInfo(callback);
         } else {
-            callback();
+					callback();
         }
     };
 
@@ -864,11 +888,9 @@
     };
 
     CDocumentMergeComparison.prototype.applyChangesToTableSize = function(oNode) {
-        this.copyPr.SkipUpdateInfo = false;
-        this.copyPr.bSaveCustomReviewType = true;
-        CDocumentComparison.prototype.applyChangesToTableSize.call(this, oNode);
-        delete this.copyPr.bSaveCustomReviewType;
-        this.copyPr.SkipUpdateInfo = true;
+	    this.executeDisableSkipUpdateInfo(function () {
+		    CDocumentComparison.prototype.applyChangesToTableSize.call(this, oNode);
+	    }.bind(this));
     };
 
     CDocumentMergeComparison.prototype.checkRowReview = function(oRowNode) {
@@ -899,6 +921,7 @@
 	      comparison.oBookmarkManager = this.oBookmarkManager;
         comparison.oComparisonMoveMarkManager = this.oComparisonMoveMarkManager;
         comparison.CommentsMap = this.CommentsMap;
+				comparison.StylesMap = this.StylesMap;
         const originalDocument = new CMockDocument();
         const revisedDocument = new CMockDocument();
         const originalParagraph = new CMockParagraph();
@@ -922,15 +945,12 @@
     CDocumentMergeComparison.prototype.getCompareReviewInfo = CDocumentResolveConflictComparison.prototype.getCompareReviewInfo;
 
     CDocumentMergeComparison.prototype.applyParagraphComparison = function (oOrigRoot, oRevisedRoot) {
-        this.copyPr.SkipUpdateInfo = false;
-        this.copyPr.bSaveCustomReviewType = true;
-        CDocumentComparison.prototype.applyParagraphComparison.call(this, oOrigRoot, oRevisedRoot);
-        for (let i = oOrigRoot.children.length - 1; i >= 0; i -= 1) {
-            this.checkParaEndReview(oOrigRoot.children[i]);
-        }
-
-        delete this.copyPr.bSaveCustomReviewType;
-        this.copyPr.SkipUpdateInfo = true;
+				this.executeDisableSkipUpdateInfo(function () {
+					CDocumentComparison.prototype.applyParagraphComparison.call(this, oOrigRoot, oRevisedRoot);
+					for (let i = oOrigRoot.children.length - 1; i >= 0; i -= 1) {
+						this.checkParaEndReview(oOrigRoot.children[i]);
+					}
+				}.bind(this));
     };
 
     CDocumentMergeComparison.prototype.getNodeConstructor = function () {
@@ -1005,7 +1025,7 @@
             const aFonts = [];
             for (let i in oFonts) {
                 if (oFonts.hasOwnProperty(i)) {
-                    aFonts[aFonts.length] = new AscFonts.CFont(i, 0, "", 0, null);
+                    aFonts[aFonts.length] = new AscFonts.CFont(i);
                 }
             }
             oApi.pre_Paste(aFonts, oImageMap, function () {
@@ -1043,6 +1063,7 @@
 	    {
 		    oOriginalDocument.UpdateBookmarks();
 	    }
+	      this.comparison.updateCommentsQuoteText();
         oOriginalDocument.Recalculate();
         oOriginalDocument.UpdateInterface();
         oOriginalDocument.FinalizeAction();
@@ -1058,7 +1079,7 @@
         oOriginalDocument.StopRecalculate();
         oOriginalDocument.StartAction(AscDFH.historydescription_Document_MergeDocuments);
         oOriginalDocument.Start_SilentMode();
-        this.oldTrackRevisions = oOriginalDocument.IsTrackRevisions();
+        this.oldTrackRevisions = oOriginalDocument.GetLocalTrackRevisions();
         oOriginalDocument.SetTrackRevisions(false);
         const oTrackRevisionManager = oOriginalDocument.TrackRevisionsManager;
         this.oldSkipPreDeleteMoveMarks = oTrackRevisionManager.SkipPreDeleteMoveMarks;
@@ -1078,27 +1099,19 @@
         }
         oApi.sync_StartAction(Asc.c_oAscAsyncActionType.BlockInteraction, Asc.c_oAscAsyncAction.SlowOperation);
 
+	    const oldTrackRevisions = oDoc1.GetLocalTrackRevisions();
+	    oDoc1.SetTrackRevisions(false);
         const oDoc2 = AscFormat.ExecuteNoHistory(function () {
             const openParams = {noSendComments: true};
-            let oDoc2 = new CDocument(oApi.WordControl.m_oDrawingDocument, true);
-            oApi.WordControl.m_oDrawingDocument.m_oLogicDocument = oDoc2;
-            oApi.WordControl.m_oLogicDocument = oDoc2;
-            const oBinaryFileReader = new AscCommonWord.BinaryFileReader(oDoc2, openParams);
+            const oTempDocument = new CDocument(oApi.WordControl.m_oDrawingDocument, false);
+            const oBinaryFileReader = new AscCommonWord.BinaryFileReader(oTempDocument, openParams);
             AscCommon.pptx_content_loader.Start_UseFullUrl(oApi.insertDocumentUrlsData);
             if (!oBinaryFileReader.Read(sBinary2)) {
-                oDoc2 = null;
+                return null;
             }
-            oApi.WordControl.m_oDrawingDocument.m_oLogicDocument = oDoc1;
-            oApi.WordControl.m_oLogicDocument = oDoc1;
-            if (oDoc1.History)
-                oDoc1.History.Set_LogicDocument(oDoc1);
-            if (oDoc1.CollaborativeEditing)
-                oDoc1.CollaborativeEditing.m_oLogicDocument = oDoc1;
-            return oDoc2;
+            return oTempDocument;
         }, this, []);
-
-        oDoc1.History.Document = oDoc1;
-
+	    oDoc1.SetTrackRevisions(oldTrackRevisions);
         if (oDoc2) {
             const oMerge = new AscCommonWord.CDocumentMerge(oDoc1, oDoc2, oOptions ? oOptions : new AscCommonWord.ComparisonOptions());
             oMerge.merge();

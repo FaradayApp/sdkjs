@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -139,9 +139,15 @@
 		this.Id         = AscCommon.g_oIdCounter.Get_NewId();
 		this.Add(this, this.Id);
 	};
+	CTableId.prototype.Delete = function(sId)
+	{
+		if(this.m_aPairs.hasOwnProperty(sId)) {
+			delete this.m_aPairs[sId];
+		}
+	};
 	CTableId.prototype.private_InitFactoryClass = function()
 	{
-		this.m_oFactoryClass[AscDFH.historyitem_type_Paragraph]              = AscCommonWord.Paragraph;
+		this.m_oFactoryClass[AscDFH.historyitem_type_Paragraph]              = AscWord.Paragraph;
 		this.m_oFactoryClass[AscDFH.historyitem_type_TextPr]                 = AscCommonWord.ParaTextPr;
 		this.m_oFactoryClass[AscDFH.historyitem_type_Hyperlink]              = AscCommonWord.ParaHyperlink;
 		this.m_oFactoryClass[AscDFH.historyitem_type_Drawing]                = AscCommonWord.ParaDrawing;

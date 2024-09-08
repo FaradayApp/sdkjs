@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -175,7 +175,7 @@ function (window, undefined) {
 			} else if (oItem instanceof Array) {
 				sTypeOf = "array";
 			} else {
-				sTypeOf = typeof(oItem);
+				sTypeOf = typeof (oItem);
 			}
 			switch (sTypeOf) {
 				case "object":
@@ -351,6 +351,41 @@ function (window, undefined) {
 			}
 			nCurPos = oBinaryReader.GetCurPos();
 		}
+	};
+
+	UndoRedoItemSerializable.prototype.GetChangedRange = function () {
+		let res = null;
+		let nActionType = this.nActionType;
+		let classType = this.oClass.nType;
+		if (classType === AscCommonExcel.g_oUndoRedoCell.nType) {
+			res = this.oRange;
+		} else if (classType === AscCommonExcel.g_oUndoRedoWorksheet.nType) {
+			if (nActionType === AscCH.historyitem_Worksheet_Sort) {
+				if (this.oData.bbox) {
+					res = new Asc.Range(this.oData.bbox.c1, this.oData.bbox.r1, this.oData.bbox.c2, this.oData.bbox.r2);
+				}
+			} else if (nActionType === AscCH.historyitem_Worksheet_MoveRange) {
+				//TODO all cols/rows in this.oRange
+				if (this.oData) {
+					res = [];
+					if (this.oData.from) {
+						res.push(new Asc.Range(this.oData.from.c1, this.oData.from.r1, this.oData.from.c2, this.oData.from.r2));
+					}
+					if (this.oData.to) {
+						res.push(new Asc.Range(this.oData.to.c1, this.oData.to.r1, this.oData.to.c2, this.oData.to.r2));
+					}
+				}
+			}
+		} else if (classType === AscCommonExcel.g_oUndoRedoComment.nType) {
+			res = new Asc.Range(this.oData.nCol, this.oData.nRow, this.oData.nCol, this.oData.nRow);
+		} else if (classType === AscCommonExcel.g_oUndoRedoSortState.nType) {
+		} else if (classType === AscCommonExcel.g_oUndoRedoCF.nType) {
+		} else if (classType === AscCommonExcel.g_oUndoRedoAutoFilters.nType) {
+		} else if (classType === AscCommonExcel.g_oUndoRedoCol.nType) {
+		} else if (classType === AscCommonExcel.g_oUndoRedoRow.nType) {
+		}
+
+		return res;
 	};
 
 //для сохранения в историю и пересылки изменений
@@ -731,7 +766,7 @@ function (window, undefined) {
 		}
 		if ((this.formulaRef &&
 			!(this.formulaRef.r1 === val.r1 && this.formulaRef.c1 === val.c1 && this.formulaRef.r2 === val.r2 &&
-			this.formulaRef.c2 === val.c2)) || (this.formulaRef !== val)) {
+				this.formulaRef.c2 === val.c2)) || (this.formulaRef !== val)) {
 			return false;
 		}
 		if (this.value.isEqual(val.value)) {
@@ -1240,13 +1275,13 @@ function (window, undefined) {
 		this.bbox.c2 = collaborativeEditing.getLockMeColumn2(nSheetId, this.bbox.c2);
 		for (var i = 0, length = this.places.length; i < length; ++i) {
 			var place = this.places[i];
-			if(this.sortByRow) {
+			if (this.sortByRow) {
 				place.from = collaborativeEditing.getLockMeColumn2(nSheetId, place.from);
 				place.to = collaborativeEditing.getLockMeColumn2(nSheetId, place.to);
 			} else {
-			place.from = collaborativeEditing.getLockMeRow2(nSheetId, place.from);
-			place.to = collaborativeEditing.getLockMeRow2(nSheetId, place.to);
-		}
+				place.from = collaborativeEditing.getLockMeRow2(nSheetId, place.from);
+				place.to = collaborativeEditing.getLockMeRow2(nSheetId, place.to);
+			}
 		}
 	};
 
@@ -1289,15 +1324,18 @@ function (window, undefined) {
 				break;
 		}
 	};
+
 	function UndoRedoData_PivotTableRedo(pivot, from, to) {
 		this.pivot = pivot;
 		this.from = from;
 		this.to = to;
 	}
+
 	UndoRedoData_PivotTableRedo.prototype = Object.create(UndoRedoData_PivotTable.prototype);
 	UndoRedoData_PivotTableRedo.prototype.Properties = {
 		pivot: 0, to: 2
 	};
+
 	function UndoRedoData_PivotField(pivot, index, from, to) {
 		this.pivot = pivot;
 		this.index = index;
@@ -1357,6 +1395,7 @@ function (window, undefined) {
 			this.binary = memory.GetData();
 		}
 	}
+
 	UndoRedoData_BinaryWrapper.prototype.getType = function () {
 		return UndoRedoDataTypes.BinaryWrapper;
 	};
@@ -1381,6 +1420,7 @@ function (window, undefined) {
 		var reader = new AscCommon.FT_Stream2(this.binary, this.len);
 		data.Read_FromBinary2(reader);
 	};
+
 	function UndoRedoData_BinaryWrapper2(data) {
 		this.binary = null;
 		this.len = 0;
@@ -1392,6 +1432,7 @@ function (window, undefined) {
 			this.binary = memory.GetData();
 		}
 	}
+
 	UndoRedoData_BinaryWrapper2.prototype.getType = function () {
 		return UndoRedoDataTypes.BinaryWrapper2;
 	};
@@ -2202,6 +2243,7 @@ function (window, undefined) {
 		this.from = from;
 		this.to = to;
 	}
+
 	UndoRedoData_NamedSheetViewRedo.prototype = Object.create(UndoRedoData_NamedSheetView.prototype);
 	UndoRedoData_NamedSheetViewRedo.prototype.Properties = {
 		sheetView: 0, to: 2
@@ -2291,10 +2333,10 @@ function (window, undefined) {
 				this.min = value;
 				break;
 			case this.Properties.max:
-				this.min = value;
+				this.max = value;
 				break;
 			case this.Properties.man:
-				this.min = value;
+				this.man = value;
 				break;
 			case this.Properties.pt:
 				this.pt = value;
@@ -2353,6 +2395,9 @@ function (window, undefined) {
 			}
 			return null;
 		};
+		this.Clean = function () {
+			this.aTypes = [];
+		};
 	};
 
 	function UndoRedoWorkbook(wb) {
@@ -2385,7 +2430,7 @@ function (window, undefined) {
 				//Добавляем лист  -> Добавляем ссылку -> undo -> undo -> redo -> redo
 				Data.sheet = outputParams.sheet;
 			} else {
-				if(Data.opt_sheet) {
+				if (Data.opt_sheet) {
 
 					/*var api = window["Asc"]["editor"];
 					api.wb.pasteSheet(Data.opt_sheet, 0, Data.name);
@@ -2466,8 +2511,10 @@ function (window, undefined) {
 					wb.editDefinesNamesUndoRedo(oldName, newName);
 					wb.handlers.trigger("asc_onEditDefName", oldName, newName);
 				}
+				// clear traces
+				wb.oApi.asc_RemoveTraceArrows(Asc.c_oAscRemoveArrowsType.all);
 			}
-		} else if(AscCH.historyitem_Workbook_Calculate === Type) {
+		} else if (AscCH.historyitem_Workbook_Calculate === Type) {
 			if (!bUndo) {
 				wb.calculate(Data.elem, nSheetId);
 			}
@@ -2478,7 +2525,7 @@ function (window, undefined) {
 				wrapper.readData(worksheetSource);
 				worksheetSource.fromWorksheetSource(worksheetSource, true);
 			}
-		}  else if(AscCH.historyitem_Workbook_Date1904 === Type) {
+		} else if (AscCH.historyitem_Workbook_Date1904 === Type) {
 			wb.setDate1904(bUndo ? Data.from : Data.to);
 			AscCommon.oNumFormatCache.cleanCache();
 		} else if (AscCH.historyitem_Workbook_ChangeExternalReference === Type) {
@@ -2497,7 +2544,7 @@ function (window, undefined) {
 			} else if (!from && to) { //добавление
 				externalReferenceIndex = wb.getExternalLinkIndexByName(to.Id);
 				if (externalReferenceIndex !== null) {
-					wb.externalReferences.splice(externalReferenceIndex - 1, 1);
+					wb._removeExternalReference(externalReferenceIndex - 1);
 				}
 			} else if (from && to) { //изменение
 				//TODO нужно сохранить ссылки на текущий лист
@@ -2511,6 +2558,18 @@ function (window, undefined) {
 				}
 			}
 			wb.handlers.trigger("asc_onUpdateExternalReferenceList");
+		} else if (AscCH.historyitem_Workbook_TimelineCacheDelete === Type) {
+			if (bUndo) {
+				wb.timelineCaches.push(Data.from);
+			} else {
+				wb.onTimelineCacheDelete(Data.from.name);
+			}
+		} else if (AscCH.historyitem_Workbook_CalcPr_iterate === Type) {
+			wb.calcPr.setIterate(bUndo ? Data.from : Data.to);
+		} else if (AscCH.historyitem_Workbook_CalcPr_iterateCount === Type) {
+			wb.calcPr.setIterateCount(bUndo ? Data.from : Data.to);
+		} else if (AscCH.historyitem_Workbook_CalcPr_iterateDelta === Type) {
+			wb.calcPr.setIterateDelta(bUndo ? Data.from : Data.to);
 		}
 	};
 	UndoRedoWorkbook.prototype.forwardTransformationIsAffect = function (Type) {
@@ -2521,7 +2580,7 @@ function (window, undefined) {
 		if (AscCH.historyitem_Workbook_DefinedNamesChange === Type) {
 			if (Data.newName && Data.newName.Ref) {
 				return {formula: Data.newName.Ref};
-			} else if(Data.to && Data.to.ref) {
+			} else if (Data.to && Data.to.ref) {
 				return {formula: Data.to.ref};
 			}
 		} else if (AscCH.historyitem_Workbook_SheetAdd === Type) {
@@ -2536,8 +2595,8 @@ function (window, undefined) {
 			if (Data && Data.newName) {
 				Data.newName.Ref = getRes.formula;
 			}
-		} else if(AscCH.historyitem_Workbook_DefinedNamesChange === Type) {
-			if(Data.to && Data.to.ref) {
+		} else if (AscCH.historyitem_Workbook_DefinedNamesChange === Type) {
+			if (Data.to && Data.to.ref) {
 				Data.to.ref = getRes.formula;
 			}
 		}
@@ -2561,7 +2620,7 @@ function (window, undefined) {
 		this.UndoRedo(Type, Data, nSheetId, false);
 	};
 	UndoRedoCell.prototype.UndoRedo = function (Type, Data, nSheetId, bUndo) {
-		var ws = this.wb.getWorksheetById(nSheetId);
+		let ws = this.wb.getWorksheetById(nSheetId), t = this;
 		if (null == ws) {
 			return;
 		}
@@ -2650,9 +2709,9 @@ function (window, undefined) {
 				}
 			} else if (AscCH.historyitem_Cell_SetApplyProtection == Type) {
 				cell.setApplyProtection(Val);
-			}  else if (AscCH.historyitem_Cell_SetLocked == Type) {
+			} else if (AscCH.historyitem_Cell_SetLocked == Type) {
 				cell.setLocked(Val);
-			}  else if (AscCH.historyitem_Cell_SetHidden == Type) {
+			} else if (AscCH.historyitem_Cell_SetHidden == Type) {
 				cell.setHiddenFormulas(Val);
 			}
 		});
@@ -2797,7 +2856,7 @@ function (window, undefined) {
 				from = collaborativeEditing.getLockOtherRow2(nSheetId, from);
 				to = collaborativeEditing.getLockOtherRow2(nSheetId, to);
 				if (false == ((true == bUndo && AscCH.historyitem_Worksheet_AddRows === Type) ||
-						(false == bUndo && AscCH.historyitem_Worksheet_RemoveRows === Type))) {
+					(false == bUndo && AscCH.historyitem_Worksheet_RemoveRows === Type))) {
 					oLockInfo = new AscCommonExcel.asc_CLockInfo();
 					oLockInfo["sheetId"] = nSheetId;
 					oLockInfo["type"] = c_oAscLockTypeElem.Range;
@@ -2842,7 +2901,7 @@ function (window, undefined) {
 				from = collaborativeEditing.getLockOtherColumn2(nSheetId, from);
 				to = collaborativeEditing.getLockOtherColumn2(nSheetId, to);
 				if (false == ((true == bUndo && AscCH.historyitem_Worksheet_AddCols === Type) ||
-						(false == bUndo && AscCH.historyitem_Worksheet_RemoveCols === Type))) {
+					(false == bUndo && AscCH.historyitem_Worksheet_RemoveCols === Type))) {
 					oLockInfo = new AscCommonExcel.asc_CLockInfo();
 					oLockInfo["sheetId"] = nSheetId;
 					oLockInfo["type"] = c_oAscLockTypeElem.Range;
@@ -2893,7 +2952,7 @@ function (window, undefined) {
 				r2 = collaborativeEditing.getLockOtherRow2(nSheetId, r2);
 				c2 = collaborativeEditing.getLockOtherColumn2(nSheetId, c2);
 				if (false == ((true == bUndo && AscCH.historyitem_Worksheet_ShiftCellsLeft === Type) ||
-						(false == bUndo && AscCH.historyitem_Worksheet_ShiftCellsRight === Type))) {
+					(false == bUndo && AscCH.historyitem_Worksheet_ShiftCellsRight === Type))) {
 					oLockInfo = new AscCommonExcel.asc_CLockInfo();
 					oLockInfo["sheetId"] = nSheetId;
 					oLockInfo["type"] = c_oAscLockTypeElem.Range;
@@ -2930,7 +2989,7 @@ function (window, undefined) {
 				r2 = collaborativeEditing.getLockOtherRow2(nSheetId, r2);
 				c2 = collaborativeEditing.getLockOtherColumn2(nSheetId, c2);
 				if (false == ((true == bUndo && AscCH.historyitem_Worksheet_ShiftCellsTop === Type) ||
-						(false == bUndo && AscCH.historyitem_Worksheet_ShiftCellsBottom === Type))) {
+					(false == bUndo && AscCH.historyitem_Worksheet_ShiftCellsBottom === Type))) {
 					oLockInfo = new AscCommonExcel.asc_CLockInfo();
 					oLockInfo["sheetId"] = nSheetId;
 					oLockInfo["type"] = c_oAscLockTypeElem.Range;
@@ -2967,7 +3026,7 @@ function (window, undefined) {
 				for (i = 0, length = Data.places.length; i < length; ++i) {
 					var place = Data.places[i];
 					place.from = sortByRow ? collaborativeEditing.getLockOtherColumn2(nSheetId, place.from) : collaborativeEditing.getLockOtherRow2(nSheetId, place.from);
-					place.to = sortByRow ?  collaborativeEditing.getLockOtherColumn2(nSheetId, place.to) : collaborativeEditing.getLockOtherRow2(nSheetId, place.to);
+					place.to = sortByRow ? collaborativeEditing.getLockOtherColumn2(nSheetId, place.to) : collaborativeEditing.getLockOtherRow2(nSheetId, place.to);
 					oLockInfo = new AscCommonExcel.asc_CLockInfo();
 					oLockInfo["sheetId"] = nSheetId;
 					oLockInfo["type"] = c_oAscLockTypeElem.Range;
@@ -3022,6 +3081,11 @@ function (window, undefined) {
 
 			worksheetView.model.autoFilters.reDrawFilter(to);
 			worksheetView.model.autoFilters.reDrawFilter(from);
+
+			// clear traces
+			if (worksheetView.traceDependentsManager) {
+				worksheetView.traceDependentsManager.clearAll();
+			}
 		} else if (AscCH.historyitem_Worksheet_Rename == Type) {
 			if (bUndo) {
 				ws.setName(Data.from);
@@ -3079,6 +3143,7 @@ function (window, undefined) {
 			data = 1;
 			if (null != to) {
 				ws.mergeManager.add(to, data);
+				ws.workbook.handlers.trigger("changeDocument", AscCommonExcel.docChangedType.mergeRange, null, to, ws.getId());
 			}
 		} else if (AscCH.historyitem_Worksheet_ChangeHyperlink === Type) {
 			from = null;
@@ -3181,7 +3246,7 @@ function (window, undefined) {
 				wb.aCollaborativeChangeElements.push(oLockInfo);
 			}
 			col = ws._getCol(index);
-			if(col) {
+			if (col) {
 				if (bUndo) {
 					col.setOutlineLevel(Data.oOldVal);
 				} else {
@@ -3220,7 +3285,7 @@ function (window, undefined) {
 			} else {
 				ws.setCollapsedCol(Data.oNewVal, index);
 			}
-		}  else if (AscCH.historyitem_Worksheet_SetFitToPage === Type) {
+		} else if (AscCH.historyitem_Worksheet_SetFitToPage === Type) {
 			ws.setFitToPage(bUndo ? Data.from : Data.to);
 		} else if (AscCH.historyitem_Worksheet_PivotAdd === Type) {
 			if (bUndo) {
@@ -3475,6 +3540,12 @@ function (window, undefined) {
 				ws.legacyDrawingHF = new AscCommonExcel.CLegacyDrawingHF(ws);
 			}
 			ws.legacyDrawingHF.changePicture(from, to);
+		} else if (AscCH.historyitem_Worksheet_TimelineDelete === Type) {
+			if (bUndo) {
+				ws.timelines.push(Data.from);
+			} else {
+				wb.onTimelinesDelete(Data.from.name);
+			}
 		}
 	};
 	UndoRedoWoorksheet.prototype.forwardTransformationIsAffect = function (Type) {
@@ -3685,8 +3756,8 @@ function (window, undefined) {
 		var ws = (null == nSheetId) ? api.wb : api.wb.getWorksheetById(nSheetId);
 		Data.worksheet = ws;
 
-		if(Data.bFilter) {
-			if(Data.tableName) {
+		if (Data.bFilter) {
+			if (Data.tableName) {
 				var table = ws.model.autoFilters._getFilterByDisplayName(Data.tableName);
 				table.SortState = bUndo ? Data.from : Data.to;
 			} else {
@@ -3871,6 +3942,12 @@ function (window, undefined) {
 			case AscCH.historyitem_Layout_FirstPageNumber:
 				pageSetup.asc_setFirstPageNumber(value);
 				break;
+			case AscCH.historyitem_Layout_HorizontalCentered:
+				pageOptions.asc_setHorizontalCentered(value);
+				break;
+			case AscCH.historyitem_Layout_VerticalCentered:
+				pageOptions.asc_setVerticalCentered(value);
+				break;
 		}
 
 		this.wb.oApi._onUpdateLayoutMenu(nSheetId);
@@ -3904,19 +3981,20 @@ function (window, undefined) {
 		var range = ws.getRange3(bbox.r1, bbox.c1, bbox.r2, bbox.c2);
 		switch (Type) {
 			case AscCH.historyitem_ArrayFromula_AddFormula:
-				if(!bUndo) {
+				if (!bUndo) {
 					AscCommonExcel.executeInR1C1Mode(false, function () {
 						range.setValue(formula, null, null, bbox);
 					});
 				}
 				break;
 			case AscCH.historyitem_ArrayFromula_DeleteFormula:
-				if(bUndo) {
+				if (bUndo) {
 					range.setValue(formula, null, null, bbox);
 				}
 				break;
 		}
 	};
+
 	function UndoRedoHeaderFooter(wb) {
 		this.wb = wb;
 		this.nType = UndoRedoClassTypes.Add(function () {
@@ -4038,6 +4116,9 @@ function (window, undefined) {
 			case AscCH.historyitem_PivotTable_SetShowHeaders:
 				pivotTable.asc_setShowHeaders(value);
 				break;
+			case AscCH.historyitem_PivotTable_SetGrandTotalCaption:
+				pivotTable.asc_setGrandTotalCaption(value);
+				break;
 			case AscCH.historyitem_PivotTable_SetCompact:
 				pivotTable.asc_setCompact(value);
 				break;
@@ -4151,7 +4232,7 @@ function (window, undefined) {
 				break;
 			case AscCH.historyitem_PivotTable_CacheField:
 				var cacheFields = pivotTable.asc_getCacheFields();
-				if(cacheFields && cacheFields[Data.index]) {
+				if (cacheFields && cacheFields[Data.index]) {
 					cacheFields[Data.index].checkSharedItems(pivotTable, Data.index, pivotTable.getRecords());
 				}
 				break;
@@ -4195,6 +4276,34 @@ function (window, undefined) {
 			case AscCH.historyitem_PivotTable_PivotCacheId:
 				pivotTable.setPivotCacheId(value);
 				break;
+			case AscCH.historyitem_PivotTable_FormatsReindex:
+				if (bUndo) {
+					pivotTable.formats = value;
+				} else {
+					pivotTable.formatsManager.reIndexDataFields(value, false);
+				}
+				break;
+			case AscCH.historyitem_PivotTable_FormatsRemoveField:
+				if (bUndo) {
+					pivotTable.formats = value;
+				} else {
+					pivotTable.formatsManager.removeField(value, false);
+				}
+				break;
+			case AscCH.historyitem_PivotTable_FormatsAddRowField:
+				if (bUndo) {
+					pivotTable.formats = value;
+				} else {
+					pivotTable.formatsManager.addRowField(value, false);
+				}
+				break;
+			case AscCH.historyitem_PivotTable_FormatsAddColField:
+				if (bUndo) {
+					pivotTable.formats = value;
+				} else {
+					pivotTable.formatsManager.addColField(value, false);
+				}
+				break;
 		}
 	};
 
@@ -4224,11 +4333,11 @@ function (window, undefined) {
 			return;
 		}
 		var fields;
-		if (Type === AscCH.historyitem_PivotTable_DataFieldSetName       ||
-			Type === AscCH.historyitem_PivotTable_DataFieldSetSubtotal   ||
+		if (Type === AscCH.historyitem_PivotTable_DataFieldSetName ||
+			Type === AscCH.historyitem_PivotTable_DataFieldSetSubtotal ||
 			Type === AscCH.historyitem_PivotTable_DataFieldSetShowDataAs ||
-			Type === AscCH.historyitem_PivotTable_DataFieldSetBaseField  ||
-			Type === AscCH.historyitem_PivotTable_DataFieldSetBaseItem   ||
+			Type === AscCH.historyitem_PivotTable_DataFieldSetBaseField ||
+			Type === AscCH.historyitem_PivotTable_DataFieldSetBaseItem ||
 			Type === AscCH.historyitem_PivotTable_DataFieldSetNumFormat) {
 			fields = pivotTable.asc_getDataFields();
 		} else {
@@ -4264,6 +4373,9 @@ function (window, undefined) {
 				break;
 			case AscCH.historyitem_PivotTable_PivotFieldSetSubtotalTop:
 				field.asc_setSubtotalTop(value, pivotTable, index);
+				break;
+			case AscCH.historyitem_PivotTable_PivotFieldSetSubtotalCaption:
+				field.asc_setSubtotalCaption(value, pivotTable, index);
 				break;
 			case AscCH.historyitem_PivotTable_PivotFieldSetShowAll:
 				field.asc_setShowAll(value, pivotTable, index);
@@ -4714,7 +4826,7 @@ function (window, undefined) {
 		if (!api.wb || !oModel) {
 			return;
 		}
-		
+
 		var protectedSheet = oModel.sheetProtection;
 		if (!protectedSheet) {
 			oModel.sheetProtection = protectedSheet = new window["Asc"].CSheetProtection();

@@ -1,5 +1,6 @@
 .idea/
 build/node_modules
+build/deserializer/cache
 build/$weak$.js
 build/maps
 common/AllFonts.js
@@ -16,6 +17,7 @@ node_modules
 package-lock.json
 */node_modules
 */package-lock.json
+connector
 /common/libfont/js/
 /common/libfont/wasm/
 /build/*-tmp.js

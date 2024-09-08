@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -468,7 +468,7 @@ asc_CChartBinary.prototype = {
         var stream = AscFormat.CreateBinaryReader(this["binary"], 0, this["binary"].length);
         //надо сбросить то, что остался после открытия документа
         AscCommon.pptx_content_loader.Clear();
-        var oNewChartSpace = new AscFormat.CChartSpace();
+        var oNewChartSpace = Asc.editor.isPdfEditor() ? new AscPDF.CPdfChart() : new AscFormat.CChartSpace();
         var oBinaryChartReader = new AscCommon.BinaryChartReader(stream);
         oBinaryChartReader.ExternalReadCT_ChartSpace(stream.size , oNewChartSpace, workSheet);
         return oNewChartSpace;
@@ -1693,6 +1693,12 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
         }
         return this.graphicObject.onSlicerDelete(sName);
     };
+    DrawingBase.prototype.onTimeSlicerDelete = function (sName) {
+        if(!this.graphicObject) {
+            return false;
+        }
+        return this.graphicObject.onTimeSlicerDelete(sName);
+    };
     DrawingBase.prototype.onSlicerLock = function (sName, bLock) {
         if(!this.graphicObject) {
             return;
@@ -2490,6 +2496,51 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
 
     };
 
+    _this.addChartSpace = function (oChartSpace) {
+        if (!_this.canEdit())
+            return;
+
+        let aSelectedDrawings = _this.controller.getSelectedArray();
+        if(aSelectedDrawings.length === 1 && aSelectedDrawings[0].isChart()) {
+            _this.controller.checkSelectedObjectsAndCallback(function () {
+                let oSelectedChartSpace = aSelectedDrawings[0];
+                oSelectedChartSpace.fromOther(oChartSpace);
+                _this.controller.startRecalculate();
+                _this.sendGraphicObjectProps();
+            }, [], false, 0, [], false);
+            return;
+        }
+
+        History.Create_NewPoint();
+        worksheet.setSelectionShape(true);
+        let oCSForAdd = oChartSpace.copy();
+        let w, h, chartLeft, chartTop;
+        w = this.convertMetric(AscCommon.AscBrowser.convertToRetinaValue(AscCommon.c_oAscChartDefines.defaultChartWidth, true), 0, 3);
+        h = this.convertMetric(AscCommon.AscBrowser.convertToRetinaValue(AscCommon.c_oAscChartDefines.defaultChartHeight, true), 0, 3);
+        chartLeft =  -this.convertMetric(this.getScrollOffset().getX(), 0, 3) + (this.convertMetric(this.getContextWidth(), 0, 3) - w) / 2;
+        if(chartLeft < 0)
+        {
+            chartLeft = 0;
+        }
+        chartTop =  -this.convertMetric(this.getScrollOffset().getY(), 0, 3) + (this.convertMetric(this.getContextHeight(), 0, 3) - h) / 2;
+        if(chartTop < 0)
+        {
+            chartTop = 0;
+        }
+        oCSForAdd.setTransformParams(chartLeft, chartTop, w, h, 0, false, false);
+        oCSForAdd.setWorksheet(this.getWorksheetModel());
+        oCSForAdd.setBDeleted(false);
+        oCSForAdd.setDrawingObjects(this);
+        oCSForAdd.addToDrawingObjects();
+        _this.controller.resetSelection();
+        _this.controller.selectObject(oCSForAdd, 0);
+        oCSForAdd.addToRecalculate();
+        oCSForAdd.checkDrawingBaseCoords();
+        _this.controller.startRecalculate();
+        this.sendGraphicObjectProps();
+
+    };
+
     _this.addSlicers = function(aNames) {
         if (_this.canEdit()) {
             if(Array.isArray(aNames) && aNames.length > 0) {
@@ -3020,6 +3071,10 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
             _this.controller.editChartDrawingObjects(chart);
             //_this.showDrawingObjects();
         }
+    };
+
+    _this.getRecommendedChartData = function () {
+
     };
 
     _this.checkSparklineGroupMinMaxVal = function(oSparklineGroup)
@@ -3916,15 +3971,19 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
 
 		var _img;
         if ( !AscCommon.isNullOrEmptyString(objectProperties.ImageUrl) ) {
-            _img = api.ImageLoader.LoadImage(objectProperties.ImageUrl, 1);
-
-            if (null != _img) {
+            if (window['IS_NATIVE_EDITOR']) {
                 _this.controller.setGraphicObjectProps( objectProperties );
-            }
-            else {
-                _this.asyncImageEndLoaded = function(_image) {
+            } else {
+                _img = api.ImageLoader.LoadImage(objectProperties.ImageUrl, 1);
+
+                if (null != _img) {
                     _this.controller.setGraphicObjectProps( objectProperties );
-                    _this.asyncImageEndLoaded = null;
+                }
+                else {
+                    _this.asyncImageEndLoaded = function(_image) {
+                        _this.controller.setGraphicObjectProps( objectProperties );
+                        _this.asyncImageEndLoaded = null;
+                    }
                 }
             }
         }
@@ -3964,6 +4023,9 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
                     }
                 }
             }
+        }
+        else if(AscFormat.isRealNumber(objectProperties.ChangeLevel)) {
+            this.setGraphicObjectLayer(objectProperties.ChangeLevel);
         }
         else {
             objectProperties.ImageUrl = null;
@@ -4054,10 +4116,42 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
     // Graphic object mouse & keyboard events
     //-----------------------------------------------------------------------------------
 
+
+    _this.onStartUserAction = function() {
+        if(!AscCommon.SpeechWorker.isEnabled) {
+            return;
+        }
+        this.HistoryIndex = AscCommon.History.Index;
+        this.BeforeActionSelectionState = this.controller.getSelectionState();
+    };
+
+    _this.onEndUserAction = function() {
+        if(!this.BeforeActionSelectionState) {
+            return;
+        }
+        if(this.HistoryIndex !== AscCommon.History.Index) {
+            return;
+        }
+
+        const oEndSelectionState = this.controller.getSelectionState();
+        const oBeforeSelectionState = this.BeforeActionSelectionState;
+        this.BeforeActionSelectionState = null;
+
+        const oSpeechData = AscCommon.getSpeechDescription(oBeforeSelectionState, oEndSelectionState);
+        if(oSpeechData) {
+            AscCommon.SpeechWorker.speech(
+                oSpeechData.type,
+                oSpeechData.obj
+            );
+        }
+    };
+
     _this.graphicObjectMouseDown = function(e, x, y) {
         var offsets = _this.drawingArea.getOffsets(x, y, true);
         if ( offsets )
             _this.controller.onMouseDown( e, pxToMm(x - offsets.x), pxToMm(y - offsets.y) );
+
+        //_this.private_UpdateCursorXY();
     };
 
     _this.graphicObjectMouseMove = function(e, x, y) {
@@ -4081,6 +4175,7 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
         var offsets = _this.drawingArea.getOffsets(x, y, true);
         if ( offsets )
             _this.controller.onMouseUp( e, pxToMm(x - offsets.x), pxToMm(y - offsets.y) );
+        //_this.private_UpdateCursorXY();
     };
 
     _this.isPointInDrawingObjects3 = function(x, y, page, bSelected, bText) {
@@ -4091,9 +4186,29 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
     };
 
     // keyboard
-
+    _this.private_UpdateCursorXY = function (bUpdateX, bUpdateY) {
+        let oController = _this.controller;
+        if(oController) {
+            let oContent = oController.getTargetDocContent();
+            if(oContent) {
+                if (true === oContent.Selection.Use && true !== oContent.Selection.Start)
+                    Asc.editor.sendEvent("asc_onSelectionEnd");
+                else if (!oContent.Selection.Use)
+                    Asc.editor.sendEvent("asc_onCursorMove");
+                return;
+            }
+        }
+        Asc.editor.sendEvent("asc_onSelectionEnd");
+    };
     _this.graphicObjectKeyDown = function(e) {
-        return _this.controller.onKeyDown( e );
+        Asc.editor.sendEvent("asc_onBeforeKeyDown", e);
+        let nHistoryIndex = AscCommon.History.Index;
+        let ret = _this.controller.onKeyDown( e );
+        // if(nHistoryIndex === AscCommon.History.Index) {
+        //     _this.private_UpdateCursorXY();
+        // }
+        Asc.editor.sendEvent("asc_onKeyDown", e);
+        return ret;
     };
     _this.graphicObjectKeyUp = function(e) {
         return _this.controller.onKeyUp( e );
@@ -4106,7 +4221,11 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
         e.AltKey = e.altKey;
         e.ShiftKey = e.shiftKey;
         e.Which = e.which;
-        return _this.controller.onKeyPress( e );
+
+        this.onStartUserAction();
+        let ret = _this.controller.onKeyPress( e );
+        this.onEndUserAction();
+        return ret;
     };
 
     //-----------------------------------------------------------------------------------
@@ -4415,11 +4534,7 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
             return false;
         }
 
-        _this.CompositeInput = {
-            Run    : oRun,
-            Pos    : oRun.State.ContentPos,
-            Length : 0
-        };
+        _this.CompositeInput = new AscWord.RunCompositeInput_Old(oRun);
 
         oRun.Set_CompositeInput(_this.CompositeInput);
         _this.controller.startRecalculate();
@@ -4433,9 +4548,11 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
         if(_this.controller.checkSelectedObjectsProtectionText()) {
             return;
         }
+        Asc.editor.sendEvent("asc_onUserActionStart");
         History.Create_NewPoint(AscDFH.historydescription_Document_CompositeInput);
         _this.beginCompositeInput();
         _this.controller.recalculateCurPos(true, true);
+        Asc.editor.sendEvent("asc_onUserActionEnd");
     };
 
 
@@ -4468,12 +4585,14 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
     {
         if (null === _this.CompositeInput)
             return;
+        Asc.editor.sendEvent("asc_onUserActionStart");
         History.Create_NewPoint(AscDFH.historydescription_Document_CompositeInputReplace);
         _this.addCompositeText(nCharCode);
         _this.checkCurrentTextObjectExtends();
         _this.controller.recalculate();
         _this.controller.recalculateCurPos(true, true);
         _this.controller.updateSelectionState();
+        Asc.editor.sendEvent("asc_onUserActionEnd");
     };
 
     _this.removeCompositeText = function(nCount){
@@ -4499,6 +4618,7 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
     {
         if (null === _this.CompositeInput)
             return;
+        Asc.editor.sendEvent("asc_onUserActionStart");
         History.Create_NewPoint(AscDFH.historydescription_Document_CompositeInputReplace);
         _this.removeCompositeText(_this.CompositeInput.Length);
         for (var nIndex = 0, nCount = arrCharCodes.length; nIndex < nCount; ++nIndex)
@@ -4509,6 +4629,7 @@ CSparklineView.prototype.setMinMaxValAx = function(minVal, maxVal, oSparklineGro
 		_this.controller.startRecalculate();
         _this.controller.recalculateCurPos(true, true);
         _this.controller.updateSelectionState();
+        Asc.editor.sendEvent("asc_onUserActionEnd");
     };
     _this.Set_CursorPosInCompositeText = function(nPos)
     {

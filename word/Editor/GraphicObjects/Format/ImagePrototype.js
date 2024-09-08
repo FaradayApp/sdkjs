@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -47,7 +47,6 @@ CImageShape.prototype.recalculateBounds = CShape.prototype.recalculateBounds;
 CImageShape.prototype.getArrayWrapPolygons = CShape.prototype.getArrayWrapPolygons;
 CImageShape.prototype.getRotateAngle = CShape.prototype.getRotateAngle;
 CImageShape.prototype.recalculateWrapPolygon = CShape.prototype.recalculateWrapPolygon;
-CImageShape.prototype.IsUseInDocument = CShape.prototype.IsUseInDocument;
 
 CImageShape.prototype.setRecalculateInfo = function()
 {

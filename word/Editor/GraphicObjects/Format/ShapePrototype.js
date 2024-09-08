@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -604,10 +604,43 @@ CShape.prototype.recalculateContent = function()
     if(content)
     {
         var body_pr = this.getBodyPr();
-        var oRecalcObj = this.recalculateDocContent(content, body_pr);
-        this.contentHeight = oRecalcObj.contentH;
-        this.contentWidth = oRecalcObj.w;
-        return oRecalcObj;
+
+        var oRecalcObject = this.recalculateDocContent(content, body_pr);
+
+        this.contentWidth = oRecalcObject.w;
+        this.contentHeight = oRecalcObject.contentH;
+        if(this.recalcInfo.recalcTitle)
+        {
+            this.recalcInfo.bRecalculatedTitle = true;
+            this.recalcInfo.recalcTitle = null;
+
+
+            var oTextWarpContent = this.checkTextWarp(content, body_pr, oRecalcObject.textRectW + oRecalcObject.correctW, oRecalcObject.textRectH + oRecalcObject.correctH, true, false);
+            this.txWarpStructParamarks = oTextWarpContent.oTxWarpStructParamarksNoTransform;
+            this.txWarpStruct = oTextWarpContent.oTxWarpStructNoTransform;
+
+            this.txWarpStructParamarksNoTransform = oTextWarpContent.oTxWarpStructParamarksNoTransform;
+            this.txWarpStructNoTransform = oTextWarpContent.oTxWarpStructNoTransform;
+        }
+        else
+        {
+            var oTextWarpContent = this.checkTextWarp(content, body_pr, oRecalcObject.textRectW + oRecalcObject.correctW, oRecalcObject.textRectH + oRecalcObject.correctH, true, true);
+            this.txWarpStructParamarks = oTextWarpContent.oTxWarpStructParamarks;
+            this.txWarpStruct = oTextWarpContent.oTxWarpStruct;
+
+            this.txWarpStructParamarksNoTransform = oTextWarpContent.oTxWarpStructParamarksNoTransform;
+            this.txWarpStructNoTransform = oTextWarpContent.oTxWarpStructNoTransform;
+        }
+        return oRecalcObject;
+    }
+    else{
+        this.txWarpStructParamarks = null;
+        this.txWarpStruct = null;
+
+        this.txWarpStructParamarksNoTransform = null;
+        this.txWarpStructNoTransform = null;
+
+        this.recalcInfo.warpGeometry = null;
     }
     return null;
 };
@@ -1194,13 +1227,13 @@ CShape.prototype.setStartPage = function(pageIndex, bNoResetSelectPage, bCheckCo
 						{
 							return true;
 						}
-						else if (para_FieldChar === oItem.Type && oItem.IsSeparate())
+						else if (para_FieldChar === oItem.Type && oItem.IsEnd())
 						{
 							var oComplexField = oItem.GetComplexField();
 							if (oComplexField)
 							{
 								var oInstruction = oComplexField.GetInstruction();
-								if (oInstruction && (fieldtype_NUMPAGES === oInstruction.GetType() || fieldtype_PAGE === oInstruction.GetType()))
+								if (oInstruction && (AscWord.fieldtype_NUMPAGES === oInstruction.GetType() || AscWord.fieldtype_PAGE === oInstruction.GetType()))
 								{
 									return true;
 								}

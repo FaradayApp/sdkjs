@@ -1,5 +1,5 @@
 /*
- * (c) Copyright Ascensio System SIA 2010-2023
+ * (c) Copyright Ascensio System SIA 2010-2024
  *
  * This program is a free software product. You can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License (AGPL)
@@ -103,7 +103,7 @@
 		const nLength = Math.max(arrData.length, this.externalReferences.length);
 		const arrFPromiseGetters = [];
 		for (let i = 0; i < nLength; i += 1) {
-			if (this.isLocalDesktop || (arrData[i] && (!arrData[i]["error"] || this.externalReferences[i].isExternalLink()))) {
+			if (this.isLocalDesktop || (arrData[i] && !arrData[i]["error"])) {
 				const oPromiseGetter = new CExternalDataPromiseGetter(this.api, this.getExternalReference(i), arrData[i]);
 				arrFPromiseGetters.push(oPromiseGetter.getPromise.bind(oPromiseGetter));
 			}
