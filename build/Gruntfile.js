@@ -371,9 +371,9 @@ module.exports = function(grunt) {
 		});
 		grunt.task.run('copy', 'clean');
 	});
-	const word = path.join(deploy, 'word');
-	const cell = path.join(deploy, 'cell');
-	const slide = path.join(deploy, 'slide');
+	// const word = path.join(deploy, 'word');
+	// const cell = path.join(deploy, 'cell');
+	// const slide = path.join(deploy, 'slide');
 	
 	const wordJsAll = 'word-all.js';
 	const wordJsMin = 'word-all-min.js';
